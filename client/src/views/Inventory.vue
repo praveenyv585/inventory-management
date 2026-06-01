@@ -13,6 +13,21 @@
           <h3 class="card-title">
             {{ t('inventory.stockLevels') }} ({{ filteredItems.length }} {{ t('inventory.skus') }})
           </h3>
+          <button class="export-btn" @click="exportToCSV">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="export-icon"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Export CSV
+          </button>
           <div class="search-box">
             <svg
               class="search-icon"
@@ -228,6 +243,58 @@
         showItemModal.value = true
       }
 
+      const exportToCSV = () => {
+        // Plain English status labels for spreadsheet compatibility (not translated)
+        const statusLabels = { lowStock: 'Low Stock', adequate: 'Adequate', inStock: 'In Stock' }
+
+        const headers = [
+          'SKU',
+          'Item Name',
+          'Category',
+          'Quantity on Hand',
+          'Reorder Point',
+          'Unit Cost',
+          'Total Value',
+          'Location',
+          'Status',
+        ]
+
+        const rows = filteredItems.value.map((item) => [
+          item.sku,
+          item.name,
+          item.category,
+          item.quantity_on_hand,
+          item.reorder_point,
+          item.unit_cost.toFixed(2),
+          (item.quantity_on_hand * item.unit_cost).toFixed(2),
+          item.location,
+          statusLabels[getStockStatusKey(item)],
+        ])
+
+        // Wrap fields containing commas or quotes in double quotes
+        const escape = (val) => {
+          const str = String(val)
+          return str.includes(',') || str.includes('"') || str.includes('\n')
+            ? `"${str.replace(/"/g, '""')}"`
+            : str
+        }
+
+        const csv = [headers, ...rows].map((row) => row.map(escape).join(',')).join('\n')
+
+        const today = new Date().toISOString().slice(0, 10)
+        const filename = `inventory-export-${today}.csv`
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', filename)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      }
+
       onMounted(loadInventory)
 
       return {
@@ -246,6 +313,7 @@
         currencySymbol,
         translateProductName,
         translateWarehouse,
+        exportToCSV,
       }
     },
   }
@@ -342,6 +410,33 @@
   .clear-search svg {
     width: 18px;
     height: 18px;
+  }
+
+  .export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .export-btn:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+  }
+
+  .export-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
   }
 
   .loading,
