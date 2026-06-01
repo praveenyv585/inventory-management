@@ -1,3 +1,5 @@
+import uuid
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -89,6 +91,33 @@ class DemandForecast(BaseModel):
     forecasted_demand: int
     trend: str
     period: str
+    unit_cost: Optional[float] = None
+    lead_time_days: Optional[int] = None
+
+class RestockingRecommendation(BaseModel):
+    id: str
+    item_sku: str
+    item_name: str
+    trend: str
+    period: str
+    current_demand: int
+    forecasted_demand: int
+    unit_cost: float
+    lead_time_days: int
+    recommended_quantity: int
+    estimated_cost: float
+    priority: int
+
+class RestockingOrderItem(BaseModel):
+    sku: str
+    name: str
+    quantity: int
+    unit_price: float
+    lead_time_days: int
+
+class RestockingOrderRequest(BaseModel):
+    items: List[RestockingOrderItem]
+    total_value: float
 
 class BacklogItem(BaseModel):
     id: str
@@ -303,6 +332,58 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+TREND_PRIORITY = {"increasing": 1, "stable": 2, "decreasing": 3}
+
+@app.get("/api/restocking/recommendations", response_model=List[RestockingRecommendation])
+def get_restocking_recommendations():
+    """Return demand forecast items enriched with cost data, sorted by priority"""
+    result = []
+    for item in demand_forecasts:
+        unit_cost = item.get("unit_cost")
+        lead_time_days = item.get("lead_time_days")
+        if unit_cost is None or lead_time_days is None:
+            continue
+        recommended_qty = item["forecasted_demand"]
+        result.append({
+            **item,
+            "recommended_quantity": recommended_qty,
+            "estimated_cost": round(recommended_qty * unit_cost, 2),
+            "priority": TREND_PRIORITY.get(item["trend"], 99),
+        })
+    result.sort(key=lambda x: (x["priority"], -x["estimated_cost"]))
+    return result
+
+@app.post("/api/restocking/submit", response_model=Order, status_code=201)
+def submit_restocking_order(request: RestockingOrderRequest):
+    """Create a restocking order and append it to the in-memory orders list"""
+    now = datetime.utcnow()
+    total_qty = sum(i.quantity for i in request.items)
+    weighted_lead = (
+        sum(i.quantity * i.lead_time_days for i in request.items) / total_qty
+        if total_qty > 0 else 14
+    )
+    expected_delivery = now + timedelta(days=round(weighted_lead))
+    existing_rst = [o for o in orders if o.get("order_number", "").startswith("RST-")]
+    order_number = f"RST-{now.year}-{len(existing_rst) + 1:04d}"
+    new_order = {
+        "id": str(uuid.uuid4()),
+        "order_number": order_number,
+        "customer": "Internal Restocking",
+        "items": [
+            {"sku": i.sku, "name": i.name, "quantity": i.quantity, "unit_price": i.unit_price}
+            for i in request.items
+        ],
+        "status": "Processing",
+        "order_date": now.isoformat(),
+        "expected_delivery": expected_delivery.isoformat(),
+        "total_value": round(request.total_value, 2),
+        "actual_delivery": None,
+        "warehouse": "All Warehouses",
+        "category": "Mixed",
+    }
+    orders.append(new_order)
+    return new_order
 
 if __name__ == "__main__":
     import uvicorn

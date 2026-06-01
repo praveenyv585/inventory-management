@@ -1,42 +1,32 @@
 <template>
   <div class="app">
-    <header class="top-nav">
-      <div class="nav-container">
-        <div class="logo">
-          <h1>{{ t('nav.companyName') }}</h1>
-          <span class="subtitle">{{ t('nav.subtitle') }}</span>
+    <AppSidebar
+      :nav-items="navItems"
+      :app-name="t('nav.companyName')"
+      @collapse-change="sidebarCollapsed = $event"
+    />
+
+    <div class="app-body" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <!-- Slim topbar: utilities only -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <span class="topbar-route">{{ currentPageTitle }}</span>
         </div>
-        <nav class="nav-tabs">
-          <router-link to="/" :class="{ active: $route.path === '/' }">
-            {{ t('nav.overview') }}
-          </router-link>
-          <router-link to="/inventory" :class="{ active: $route.path === '/inventory' }">
-            {{ t('nav.inventory') }}
-          </router-link>
-          <router-link to="/orders" :class="{ active: $route.path === '/orders' }">
-            {{ t('nav.orders') }}
-          </router-link>
-          <router-link to="/spending" :class="{ active: $route.path === '/spending' }">
-            {{ t('nav.finance') }}
-          </router-link>
-          <router-link to="/demand" :class="{ active: $route.path === '/demand' }">
-            {{ t('nav.demandForecast') }}
-          </router-link>
-          <router-link to="/reports" :class="{ active: $route.path === '/reports' }">
-            Reports
-          </router-link>
-        </nav>
-        <LanguageSwitcher />
-        <ProfileMenu
-          @show-profile-details="showProfileDetails = true"
-          @show-tasks="showTasks = true"
-        />
-      </div>
-    </header>
-    <FilterBar />
-    <main class="main-content">
-      <router-view />
-    </main>
+        <div class="topbar-right">
+          <LanguageSwitcher />
+          <ProfileMenu
+            @show-profile-details="showProfileDetails = true"
+            @show-tasks="showTasks = true"
+          />
+        </div>
+      </header>
+
+      <FilterBar />
+
+      <main class="main-content">
+        <router-view />
+      </main>
+    </div>
 
     <ProfileDetailsModal
       :is-open="showProfileDetails"
@@ -55,10 +45,12 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from './api'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
+import AppSidebar from './components/AppSidebar.vue'
 import FilterBar from './components/FilterBar.vue'
 import ProfileMenu from './components/ProfileMenu.vue'
 import ProfileDetailsModal from './components/ProfileDetailsModal.vue'
@@ -68,6 +60,7 @@ import LanguageSwitcher from './components/LanguageSwitcher.vue'
 export default {
   name: 'App',
   components: {
+    AppSidebar,
     FilterBar,
     ProfileMenu,
     ProfileDetailsModal,
@@ -77,14 +70,35 @@ export default {
   setup() {
     const { currentUser } = useAuth()
     const { t } = useI18n()
+    const route = useRoute()
     const showProfileDetails = ref(false)
     const showTasks = ref(false)
     const apiTasks = ref([])
+    const sidebarCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
 
-    // Merge mock tasks from currentUser with API tasks
-    const tasks = computed(() => {
-      return [...currentUser.value.tasks, ...apiTasks.value]
-    })
+    const navItems = computed(() => [
+      { path: '/',           label: t('nav.overview'),       icon: '◉' },
+      { path: '/inventory',  label: t('nav.inventory'),      icon: '⬡' },
+      { path: '/orders',     label: t('nav.orders'),         icon: '⬜' },
+      { path: '/spending',   label: t('nav.finance'),        icon: '◈' },
+      { path: '/demand',     label: t('nav.demandForecast'), icon: '△' },
+      { path: '/reports',    label: 'Reports',               icon: '▤' },
+      { path: '/restocking', label: t('nav.restocking'),     icon: '↺' },
+    ])
+
+    const pageTitleMap = computed(() => ({
+      '/':           t('nav.overview'),
+      '/inventory':  t('nav.inventory'),
+      '/orders':     t('nav.orders'),
+      '/spending':   t('nav.finance'),
+      '/demand':     t('nav.demandForecast'),
+      '/reports':    'Reports',
+      '/restocking': t('nav.restocking'),
+    }))
+
+    const currentPageTitle = computed(() => pageTitleMap.value[route.path] || '')
+
+    const tasks = computed(() => [...currentUser.value.tasks, ...apiTasks.value])
 
     const loadTasks = async () => {
       try {
@@ -97,7 +111,6 @@ export default {
     const addTask = async (taskData) => {
       try {
         const newTask = await api.createTask(taskData)
-        // Add new task to the beginning of the array
         apiTasks.value.unshift(newTask)
       } catch (err) {
         console.error('Failed to add task:', err)
@@ -106,17 +119,11 @@ export default {
 
     const deleteTask = async (taskId) => {
       try {
-        // Check if it's a mock task (from currentUser)
         const isMockTask = currentUser.value.tasks.some(t => t.id === taskId)
-
         if (isMockTask) {
-          // Remove from mock tasks
           const index = currentUser.value.tasks.findIndex(t => t.id === taskId)
-          if (index !== -1) {
-            currentUser.value.tasks.splice(index, 1)
-          }
+          if (index !== -1) currentUser.value.tasks.splice(index, 1)
         } else {
-          // Remove from API tasks
           await api.deleteTask(taskId)
           apiTasks.value = apiTasks.value.filter(t => t.id !== taskId)
         }
@@ -127,19 +134,13 @@ export default {
 
     const toggleTask = async (taskId) => {
       try {
-        // Check if it's a mock task (from currentUser)
         const mockTask = currentUser.value.tasks.find(t => t.id === taskId)
-
         if (mockTask) {
-          // Toggle mock task status
           mockTask.status = mockTask.status === 'pending' ? 'completed' : 'pending'
         } else {
-          // Toggle API task
           const updatedTask = await api.toggleTask(taskId)
           const index = apiTasks.value.findIndex(t => t.id === taskId)
-          if (index !== -1) {
-            apiTasks.value[index] = updatedTask
-          }
+          if (index !== -1) apiTasks.value[index] = updatedTask
         }
       } catch (err) {
         console.error('Failed to toggle task:', err)
@@ -150,8 +151,11 @@ export default {
 
     return {
       t,
+      navItems,
+      currentPageTitle,
       showProfileDetails,
       showTasks,
+      sidebarCollapsed,
       tasks,
       addTask,
       deleteTask,
@@ -162,325 +166,304 @@ export default {
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ── Design tokens ───────────────────────────────── */
+:root {
+  --color-accent:        #2563eb;
+  --color-accent-hover:  #1d4ed8;
+  --color-accent-bg:     #eff6ff;
+  --color-accent-text:   #1e40af;
+
+  --sidebar-bg:          #0f172a;
+  --sidebar-text:        #94a3b8;
+  --sidebar-text-hover:  #f1f5f9;
+  --sidebar-text-active: #ffffff;
+  --sidebar-item-hover:  #1e293b;
+  --sidebar-item-active: #1e3a5f;
+  --sidebar-border:      #1e293b;
+  --sidebar-width:       220px;
+  --sidebar-collapsed:   56px;
+
+  --surface-page:        #f8fafc;
+  --surface-card:        #ffffff;
+  --surface-card-hover:  #f8fafc;
+
+  --border-subtle:       #e2e8f0;
+  --border-default:      #cbd5e1;
+
+  --text-primary:        #0f172a;
+  --text-secondary:      #475569;
+  --text-muted:          #94a3b8;
+
+  --status-success-bg:   #d1fae5;
+  --status-success-text: #065f46;
+  --status-warning-bg:   #fed7aa;
+  --status-warning-text: #92400e;
+  --status-danger-bg:    #fecaca;
+  --status-danger-text:  #991b1b;
+  --status-info-bg:      #dbeafe;
+  --status-info-text:    #1e40af;
+
+  --space-1:  4px;   --space-2: 8px;   --space-3: 12px;
+  --space-4:  16px;  --space-5: 20px;  --space-6: 24px;
+  --space-8:  32px;  --space-10: 40px;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+  --radius-sm: 4px;  --radius-md: 8px;  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04);
 }
+
+/* ── Reset ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: var(--font-sans);
+  background: var(--surface-page);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
+/* ── App shell ───────────────────────────────────── */
 .app {
   display: flex;
-  flex-direction: column;
   min-height: 100vh;
 }
 
-.top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  background: var(--surface-page);
 }
 
-.nav-container {
-  max-width: 1600px;
-  margin: 0 auto;
+/* ── Topbar ──────────────────────────────────────── */
+.topbar {
+  height: 52px;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
-  padding: 0 2rem;
-  height: 70px;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
-.nav-container > .nav-tabs {
-  margin-left: auto;
-  margin-right: 1rem;
+.topbar-left { display: flex; align-items: center; gap: var(--space-3); }
+.topbar-route {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
 }
+.topbar-right { display: flex; align-items: center; gap: var(--space-3); }
 
-.nav-container > .language-switcher {
-  margin-right: 1rem;
-}
-
-.logo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-}
-
-.logo h1 {
-  font-size: 1.375rem;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.025em;
-}
-
-.subtitle {
-  font-size: 0.813rem;
-  color: #64748b;
-  font-weight: 400;
-  padding-left: 0.75rem;
-  border-left: 1px solid #e2e8f0;
-}
-
-.nav-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.nav-tabs a {
-  padding: 0.625rem 1.25rem;
-  color: #64748b;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.938rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.nav-tabs a:hover {
-  color: #0f172a;
-  background: #f1f5f9;
-}
-
-.nav-tabs a.active {
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-.nav-tabs a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #2563eb;
-}
-
+/* ── Main content ────────────────────────────────── */
 .main-content {
   flex: 1;
-  max-width: 1600px;
+  padding: var(--space-6);
+  max-width: 1400px;
   width: 100%;
-  margin: 0 auto;
-  padding: 1.5rem 2rem;
 }
 
-.page-header {
-  margin-bottom: 1.5rem;
-}
+/* ── Page header ─────────────────────────────────── */
+.page-header { margin-bottom: var(--space-6); }
 
 .page-header h2 {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 0.375rem;
+  color: var(--text-primary);
   letter-spacing: -0.025em;
+  margin-bottom: 0.375rem;
 }
 
 .page-header p {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 0.938rem;
 }
 
+/* ── Stats grid ──────────────────────────────────── */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .stat-card {
-  background: white;
-  padding: 1.25rem;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  transition: all 0.2s ease;
+  background: var(--surface-card);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s, border-color 0.15s;
 }
 
 .stat-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-label {
-  color: #64748b;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.625rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
 }
 
 .stat-value {
   font-size: 2.25rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   letter-spacing: -0.025em;
 }
 
-.stat-card.warning .stat-value {
-  color: #ea580c;
-}
+.stat-card.success .stat-value { color: #059669; }
+.stat-card.warning .stat-value { color: #d97706; }
+.stat-card.danger  .stat-value { color: #dc2626; }
+.stat-card.info    .stat-value { color: var(--color-accent); }
 
-.stat-card.success .stat-value {
-  color: #059669;
-}
-
-.stat-card.danger .stat-value {
-  color: #dc2626;
-}
-
-.stat-card.info .stat-value {
-  color: #2563eb;
-}
-
+/* ── Cards ───────────────────────────────────────── */
 .card {
-  background: white;
-  border-radius: 10px;
-  padding: 1.25rem;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 1.25rem;
+  background: var(--surface-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.875rem;
-  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .card-title {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.025em;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
-.table-container {
-  overflow-x: auto;
-}
+/* ── Tables ──────────────────────────────────────── */
+.table-container { overflow-x: auto; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
+table { width: 100%; border-collapse: collapse; }
 
 thead {
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--surface-page);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 th {
   text-align: left;
-  padding: 0.5rem 0.75rem;
-  font-weight: 600;
-  color: #475569;
+  padding: var(--space-2) var(--space-4);
   font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
 
 td {
-  padding: 0.5rem 0.75rem;
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid #f1f5f9;
-  color: #334155;
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 
-tbody tr {
-  transition: background-color 0.15s ease;
-}
+tbody tr { transition: background-color 0.1s; }
+tbody tr:hover { background: var(--surface-card-hover); }
 
-tbody tr:hover {
-  background: #f8fafc;
-}
-
+/* ── Badges ──────────────────────────────────────── */
 .badge {
   display: inline-block;
-  padding: 0.313rem 0.75rem;
-  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  border-radius: 5px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.025em;
+  letter-spacing: 0.04em;
 }
 
-.badge.success {
-  background: #d1fae5;
-  color: #065f46;
-}
+.badge.success    { background: var(--status-success-bg);  color: var(--status-success-text); }
+.badge.warning    { background: var(--status-warning-bg);  color: var(--status-warning-text); }
+.badge.danger     { background: var(--status-danger-bg);   color: var(--status-danger-text);  }
+.badge.info       { background: var(--status-info-bg);     color: var(--status-info-text);    }
+.badge.increasing { background: var(--status-success-bg);  color: var(--status-success-text); }
+.badge.decreasing { background: var(--status-danger-bg);   color: var(--status-danger-text);  }
+.badge.stable     { background: #e0e7ff; color: #3730a3; }
+.badge.high       { background: var(--status-danger-bg);   color: var(--status-danger-text);  }
+.badge.medium     { background: var(--status-warning-bg);  color: var(--status-warning-text); }
+.badge.low        { background: var(--status-info-bg);     color: var(--status-info-text);    }
 
-.badge.warning {
-  background: #fed7aa;
-  color: #92400e;
-}
-
-.badge.danger {
-  background: #fecaca;
-  color: #991b1b;
-}
-
-.badge.info {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.badge.increasing {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.badge.decreasing {
-  background: #fecaca;
-  color: #991b1b;
-}
-
-.badge.stable {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.badge.high {
-  background: #fecaca;
-  color: #991b1b;
-}
-
-.badge.medium {
-  background: #fed7aa;
-  color: #92400e;
-}
-
-.badge.low {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
+/* ── State: loading / error ──────────────────────── */
 .loading {
   text-align: center;
-  padding: 3rem;
-  color: #64748b;
+  padding: var(--space-10);
+  color: var(--text-muted);
   font-size: 0.938rem;
 }
 
 .error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  padding: 1rem;
-  border-radius: 8px;
-  margin: 1rem 0;
+  background: var(--status-danger-bg);
+  border: 1px solid #fca5a5;
+  color: var(--status-danger-text);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin: var(--space-4) 0;
   font-size: 0.938rem;
+}
+
+/* ── Sidebar tooltip portal ──────────────────────── */
+.sidebar-tooltip-portal {
+  position: fixed;
+  transform: translateY(-50%);
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,.3);
+}
+
+.sidebar-tooltip-portal::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #334155;
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 767px) {
+  /* On mobile the sidebar is fixed/overlaid — body takes full width */
+  .app-body {
+    margin-left: 56px;  /* matches collapsed icon-strip width */
+    width: calc(100% - 56px);
+  }
 }
 </style>

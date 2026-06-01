@@ -46,7 +46,10 @@
             </thead>
             <tbody>
               <tr v-for="order in orders" :key="order.id">
-                <td class="col-order-number"><strong>{{ order.order_number }}</strong></td>
+                <td class="col-order-number">
+                  <strong>{{ order.order_number }}</strong>
+                  <span v-if="isRestockingOrder(order)" class="restocking-badge">Restocking</span>
+                </td>
                 <td class="col-customer">{{ translateCustomerName(order.customer) }}</td>
                 <td class="col-items">
                   <details class="items-details">
@@ -67,7 +70,12 @@
                   </span>
                 </td>
                 <td class="col-date">{{ formatDate(order.order_date) }}</td>
-                <td class="col-date">{{ formatDate(order.expected_delivery) }}</td>
+                <td class="col-date">
+                  <template v-if="isRestockingOrder(order)">
+                    <span class="delivery-lead">{{ getLeadTimeDays(order) }} days</span> · {{ formatDate(order.expected_delivery) }}
+                  </template>
+                  <template v-else>{{ formatDate(order.expected_delivery) }}</template>
+                </td>
                 <td class="col-value"><strong>{{ currencySymbol }}{{ order.total_value.toLocaleString() }}</strong></td>
               </tr>
             </tbody>
@@ -153,6 +161,14 @@ export default {
       })
     }
 
+    const isRestockingOrder = (order) => order.order_number.startsWith('RST-')
+
+    const getLeadTimeDays = (order) => {
+      const start = new Date(order.order_date)
+      const end = new Date(order.expected_delivery)
+      return Math.round((end - start) / (1000 * 60 * 60 * 24))
+    }
+
     onMounted(loadOrders)
 
     return {
@@ -163,6 +179,8 @@ export default {
       getOrdersByStatus,
       getOrderStatusClass,
       formatDate,
+      isRestockingOrder,
+      getLeadTimeDays,
       currencySymbol,
       translateProductName,
       translateCustomerName
@@ -180,7 +198,7 @@ export default {
 
 /* Column widths */
 .col-order-number {
-  width: 130px;
+  width: 190px;
 }
 
 .col-customer {
@@ -274,6 +292,25 @@ export default {
 
 .item-meta {
   font-size: 0.813rem;
+  color: #64748b;
+}
+
+.restocking-badge {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 0.375rem;
+  vertical-align: middle;
+}
+
+.delivery-lead {
+  font-weight: 600;
   color: #64748b;
 }
 </style>
