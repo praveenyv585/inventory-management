@@ -31,8 +31,8 @@
         <div class="card-header">
           <h3 class="card-title">Backlog Items</h3>
         </div>
-        <div v-if="backlogItems.length === 0" style="padding: 3rem; text-align: center;">
-          <p style="font-size: 1.125rem; color: #10b981; font-weight: 600;">
+        <div v-if="backlogItems.length === 0" style="padding: 3rem; text-align: center">
+          <p style="font-size: 1.125rem; color: #10b981; font-weight: 600">
             ✓ No backlog items - all orders can be fulfilled!
           </p>
         </div>
@@ -52,8 +52,12 @@
             </thead>
             <tbody>
               <tr v-for="item in backlogItems" :key="item.id">
-                <td><strong>{{ item.order_id }}</strong></td>
-                <td><strong>{{ item.item_sku }}</strong></td>
+                <td>
+                  <strong>{{ item.order_id }}</strong>
+                </td>
+                <td>
+                  <strong>{{ item.item_sku }}</strong>
+                </td>
                 <td>{{ item.item_name }}</td>
                 <td>{{ item.quantity_needed }}</td>
                 <td>{{ item.quantity_available }}</td>
@@ -82,71 +86,71 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
-import { api } from '../api'
-import { useFilters } from '../composables/useFilters'
+  import { ref, onMounted, watch, computed } from 'vue'
+  import { api } from '../api'
+  import { useFilters } from '../composables/useFilters'
 
-export default {
-  name: 'Backlog',
-  setup() {
-    const loading = ref(true)
-    const error = ref(null)
-    const allBacklogItems = ref([])
-    const inventoryItems = ref([])
+  export default {
+    name: 'Backlog',
+    setup() {
+      const loading = ref(true)
+      const error = ref(null)
+      const allBacklogItems = ref([])
+      const inventoryItems = ref([])
 
-    // Use shared filters
-    const { selectedLocation, selectedCategory, getCurrentFilters } = useFilters()
+      // Use shared filters
+      const { selectedLocation, selectedCategory, getCurrentFilters } = useFilters()
 
-    // Filter backlog based on inventory filters
-    const backlogItems = computed(() => {
-      if (selectedLocation.value === 'all' && selectedCategory.value === 'all') {
-        return allBacklogItems.value
+      // Filter backlog based on inventory filters
+      const backlogItems = computed(() => {
+        if (selectedLocation.value === 'all' && selectedCategory.value === 'all') {
+          return allBacklogItems.value
+        }
+
+        // Get SKUs of items that match the filters
+        const validSkus = new Set(inventoryItems.value.map((item) => item.sku))
+        return allBacklogItems.value.filter((b) => validSkus.has(b.item_sku))
+      })
+
+      const loadBacklog = async () => {
+        try {
+          loading.value = true
+          const filters = getCurrentFilters()
+
+          const [backlogData, inventoryData] = await Promise.all([
+            api.getBacklog(),
+            api.getInventory({
+              warehouse: filters.warehouse,
+              category: filters.category,
+            }),
+          ])
+
+          allBacklogItems.value = backlogData
+          inventoryItems.value = inventoryData
+        } catch (err) {
+          error.value = 'Failed to load backlog: ' + err.message
+        } finally {
+          loading.value = false
+        }
       }
 
-      // Get SKUs of items that match the filters
-      const validSkus = new Set(inventoryItems.value.map(item => item.sku))
-      return allBacklogItems.value.filter(b => validSkus.has(b.item_sku))
-    })
-
-    const loadBacklog = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-
-        const [backlogData, inventoryData] = await Promise.all([
-          api.getBacklog(),
-          api.getInventory({
-            warehouse: filters.warehouse,
-            category: filters.category
-          })
-        ])
-
-        allBacklogItems.value = backlogData
-        inventoryItems.value = inventoryData
-      } catch (err) {
-        error.value = 'Failed to load backlog: ' + err.message
-      } finally {
-        loading.value = false
+      const getBacklogByPriority = (priority) => {
+        return backlogItems.value.filter((item) => item.priority === priority)
       }
-    }
 
-    const getBacklogByPriority = (priority) => {
-      return backlogItems.value.filter(item => item.priority === priority)
-    }
+      // Watch for filter changes and reload data
+      watch([selectedLocation, selectedCategory], () => {
+        loadBacklog()
+      })
 
-    // Watch for filter changes and reload data
-    watch([selectedLocation, selectedCategory], () => {
-      loadBacklog()
-    })
+      onMounted(loadBacklog)
 
-    onMounted(loadBacklog)
-
-    return {
-      loading,
-      error,
-      backlogItems,
-      getBacklogByPriority
-    }
+      return {
+        loading,
+        error,
+        backlogItems,
+        getBacklogByPriority,
+      }
+    },
   }
-}
 </script>

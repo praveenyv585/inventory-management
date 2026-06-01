@@ -18,8 +18,8 @@ const router = createRouter({
     { path: '/demand', component: Demand },
     { path: '/spending', component: Spending },
     { path: '/reports', component: Reports },
-    { path: '/restocking', component: Restocking }
-  ]
+    { path: '/restocking', component: Restocking },
+  ],
 })
 
 const app = createApp(App)
