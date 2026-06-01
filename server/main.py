@@ -385,6 +385,52 @@ def submit_restocking_order(request: RestockingOrderRequest):
     orders.append(new_order)
     return new_order
 
+# In-memory task store (resets on server restart, consistent with app's mock-data pattern)
+tasks_store: List[dict] = []
+
+class Task(BaseModel):
+    id: str
+    title: str
+    status: str  # "pending" | "completed"
+
+class CreateTaskRequest(BaseModel):
+    title: str
+
+@app.get("/api/tasks", response_model=List[Task])
+def get_tasks():
+    """Get all tasks"""
+    return tasks_store
+
+@app.post("/api/tasks", response_model=Task, status_code=201)
+def create_task(request: CreateTaskRequest):
+    """Create a new task"""
+    task = {
+        "id": str(uuid.uuid4()),
+        "title": request.title,
+        "status": "pending"
+    }
+    tasks_store.append(task)
+    return task
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task(task_id: str):
+    """Delete a task"""
+    global tasks_store
+    task = next((t for t in tasks_store if t["id"] == task_id), None)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    tasks_store = [t for t in tasks_store if t["id"] != task_id]
+    return {"ok": True}
+
+@app.patch("/api/tasks/{task_id}", response_model=Task)
+def toggle_task(task_id: str):
+    """Toggle a task's status between pending and completed"""
+    task = next((t for t in tasks_store if t["id"] == task_id), None)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    task["status"] = "completed" if task["status"] == "pending" else "pending"
+    return task
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
