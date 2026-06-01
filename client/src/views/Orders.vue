@@ -59,7 +59,10 @@
                     <div class="items-dropdown">
                       <div v-for="(item, idx) in order.items" :key="idx" class="item-entry">
                         <span class="item-name">{{ translateProductName(item.name) }}</span>
-                        <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_price }}</span>
+                        <span class="item-meta"
+                          >{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol
+                          }}{{ item.unit_price }}</span
+                        >
                       </div>
                     </div>
                   </details>
@@ -72,11 +75,14 @@
                 <td class="col-date">{{ formatDate(order.order_date) }}</td>
                 <td class="col-date">
                   <template v-if="isRestockingOrder(order)">
-                    <span class="delivery-lead">{{ getLeadTimeDays(order) }} days</span> · {{ formatDate(order.expected_delivery) }}
+                    <span class="delivery-lead">{{ getLeadTimeDays(order) }} days</span> ·
+                    {{ formatDate(order.expected_delivery) }}
                   </template>
                   <template v-else>{{ formatDate(order.expected_delivery) }}</template>
                 </td>
-                <td class="col-value"><strong>{{ currencySymbol }}{{ order.total_value.toLocaleString() }}</strong></td>
+                <td class="col-value">
+                  <strong>{{ currencySymbol }}{{ order.total_value.toLocaleString() }}</strong>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -87,230 +93,232 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
-import { api } from '../api'
-import { useFilters } from '../composables/useFilters'
-import { useI18n } from '../composables/useI18n'
+  import { ref, onMounted, watch, computed } from 'vue'
+  import { api } from '../api'
+  import { useFilters } from '../composables/useFilters'
+  import { useI18n } from '../composables/useI18n'
 
-export default {
-  name: 'Orders',
-  setup() {
-    const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
+  export default {
+    name: 'Orders',
+    setup() {
+      const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
 
-    const currencySymbol = computed(() => {
-      return currentCurrency.value === 'JPY' ? '¥' : '$'
-    })
-    const loading = ref(true)
-    const error = ref(null)
-    const orders = ref([])
-
-    // Use shared filters
-    const {
-      selectedPeriod,
-      selectedLocation,
-      selectedCategory,
-      selectedStatus,
-      getCurrentFilters
-    } = useFilters()
-
-    const loadOrders = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-        const fetchedOrders = await api.getOrders(filters)
-
-        // Sort orders by order_date (earliest first)
-        orders.value = fetchedOrders.sort((a, b) => {
-          const dateA = new Date(a.order_date)
-          const dateB = new Date(b.order_date)
-          return dateA - dateB
-        })
-      } catch (err) {
-        error.value = 'Failed to load orders: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    // Watch for filter changes and reload data
-    watch([selectedPeriod, selectedLocation, selectedCategory, selectedStatus], () => {
-      loadOrders()
-    })
-
-    const getOrdersByStatus = (status) => {
-      return orders.value.filter(order => order.status === status)
-    }
-
-    const getOrderStatusClass = (status) => {
-      const statusMap = {
-        'Delivered': 'success',
-        'Shipped': 'info',
-        'Processing': 'warning',
-        'Backordered': 'danger'
-      }
-      return statusMap[status] || 'info'
-    }
-
-    const formatDate = (dateString) => {
-      const { currentLocale } = useI18n()
-      const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
-      return new Date(dateString).toLocaleDateString(locale, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+      const currencySymbol = computed(() => {
+        return currentCurrency.value === 'JPY' ? '¥' : '$'
       })
-    }
+      const loading = ref(true)
+      const error = ref(null)
+      const orders = ref([])
 
-    const isRestockingOrder = (order) => order.order_number.startsWith('RST-')
+      // Use shared filters
+      const {
+        selectedPeriod,
+        selectedLocation,
+        selectedCategory,
+        selectedStatus,
+        getCurrentFilters,
+      } = useFilters()
 
-    const getLeadTimeDays = (order) => {
-      const start = new Date(order.order_date)
-      const end = new Date(order.expected_delivery)
-      return Math.round((end - start) / (1000 * 60 * 60 * 24))
-    }
+      const loadOrders = async () => {
+        try {
+          loading.value = true
+          const filters = getCurrentFilters()
+          const fetchedOrders = await api.getOrders(filters)
 
-    onMounted(loadOrders)
+          // Sort orders by order_date (earliest first)
+          orders.value = fetchedOrders.sort((a, b) => {
+            const dateA = new Date(a.order_date)
+            const dateB = new Date(b.order_date)
+            return dateA - dateB
+          })
+        } catch (err) {
+          error.value = 'Failed to load orders: ' + err.message
+        } finally {
+          loading.value = false
+        }
+      }
 
-    return {
-      t,
-      loading,
-      error,
-      orders,
-      getOrdersByStatus,
-      getOrderStatusClass,
-      formatDate,
-      isRestockingOrder,
-      getLeadTimeDays,
-      currencySymbol,
-      translateProductName,
-      translateCustomerName
-    }
+      // Watch for filter changes and reload data
+      watch([selectedPeriod, selectedLocation, selectedCategory, selectedStatus], () => {
+        loadOrders()
+      })
+
+      const getOrdersByStatus = (status) => {
+        return orders.value.filter((order) => order.status === status)
+      }
+
+      const getOrderStatusClass = (status) => {
+        const statusMap = {
+          Delivered: 'success',
+          Shipped: 'info',
+          Processing: 'warning',
+          Backordered: 'danger',
+        }
+        return statusMap[status] || 'info'
+      }
+
+      const formatDate = (dateString) => {
+        const { currentLocale } = useI18n()
+        const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
+        return new Date(dateString).toLocaleDateString(locale, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      }
+
+      const isRestockingOrder = (order) => order.order_number.startsWith('RST-')
+
+      const getLeadTimeDays = (order) => {
+        const start = new Date(order.order_date)
+        const end = new Date(order.expected_delivery)
+        return Math.round((end - start) / (1000 * 60 * 60 * 24))
+      }
+
+      onMounted(loadOrders)
+
+      return {
+        t,
+        loading,
+        error,
+        orders,
+        getOrdersByStatus,
+        getOrderStatusClass,
+        formatDate,
+        isRestockingOrder,
+        getLeadTimeDays,
+        currencySymbol,
+        translateProductName,
+        translateCustomerName,
+      }
+    },
   }
-}
 </script>
 
 <style scoped>
-/* Fixed table layout to prevent column shifting */
-.orders-table {
-  table-layout: fixed;
-  width: 100%;
-}
+  /* Fixed table layout to prevent column shifting */
+  .orders-table {
+    table-layout: fixed;
+    width: 100%;
+  }
 
-/* Column widths */
-.col-order-number {
-  width: 190px;
-}
+  /* Column widths */
+  .col-order-number {
+    width: 190px;
+  }
 
-.col-customer {
-  width: 180px;
-}
+  .col-customer {
+    width: 180px;
+  }
 
-.col-items {
-  width: 200px;
-}
+  .col-items {
+    width: 200px;
+  }
 
-.col-status {
-  width: 130px;
-}
+  .col-status {
+    width: 130px;
+  }
 
-.col-date {
-  width: 140px;
-}
+  .col-date {
+    width: 140px;
+  }
 
-.col-value {
-  width: 120px;
-}
+  .col-value {
+    width: 120px;
+  }
 
-/* Items details styling */
-.items-details {
-  position: relative;
-}
+  /* Items details styling */
+  .items-details {
+    position: relative;
+  }
 
-.items-summary {
-  cursor: pointer;
-  color: #3b82f6;
-  font-weight: 500;
-  list-style: none;
-  user-select: none;
-  display: inline-block;
-}
+  .items-summary {
+    cursor: pointer;
+    color: #3b82f6;
+    font-weight: 500;
+    list-style: none;
+    user-select: none;
+    display: inline-block;
+  }
 
-.items-summary::-webkit-details-marker {
-  display: none;
-}
+  .items-summary::-webkit-details-marker {
+    display: none;
+  }
 
-.items-summary::before {
-  content: '▶';
-  display: inline-block;
-  margin-right: 0.375rem;
-  font-size: 0.75rem;
-  transition: transform 0.2s;
-}
+  .items-summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 0.375rem;
+    font-size: 0.75rem;
+    transition: transform 0.2s;
+  }
 
-.items-details[open] .items-summary::before {
-  transform: rotate(90deg);
-}
+  .items-details[open] .items-summary::before {
+    transform: rotate(90deg);
+  }
 
-.items-summary:hover {
-  color: #2563eb;
-  text-decoration: underline;
-}
+  .items-summary:hover {
+    color: #2563eb;
+    text-decoration: underline;
+  }
 
-/* Dropdown container */
-.items-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 0.5rem;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  padding: 0.75rem;
-  z-index: 10;
-  min-width: 300px;
-  max-width: 400px;
-}
+  /* Dropdown container */
+  .items-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.5rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    padding: 0.75rem;
+    z-index: 10;
+    min-width: 300px;
+    max-width: 400px;
+  }
 
-.item-entry {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
-}
+  .item-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
 
-.item-entry:last-child {
-  border-bottom: none;
-}
+  .item-entry:last-child {
+    border-bottom: none;
+  }
 
-.item-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #0f172a;
-}
+  .item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #0f172a;
+  }
 
-.item-meta {
-  font-size: 0.813rem;
-  color: #64748b;
-}
+  .item-meta {
+    font-size: 0.813rem;
+    color: #64748b;
+  }
 
-.restocking-badge {
-  display: inline-block;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 0.625rem;
-  padding: 0.125rem 0.4rem;
-  border-radius: 4px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-left: 0.375rem;
-  vertical-align: middle;
-}
+  .restocking-badge {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 0.625rem;
+    padding: 0.125rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 0.375rem;
+    vertical-align: middle;
+  }
 
-.delivery-lead {
-  font-weight: 600;
-  color: #64748b;
-}
+  .delivery-lead {
+    font-weight: 600;
+    color: #64748b;
+  }
 </style>

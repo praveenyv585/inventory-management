@@ -62,7 +62,11 @@
         title="Reset all filters"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+          <path
+            fill-rule="evenodd"
+            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+            clip-rule="evenodd"
+          />
         </svg>
       </button>
     </div>
@@ -70,124 +74,124 @@
 </template>
 
 <script>
-import { useFilters } from '../composables/useFilters'
-import { useI18n } from '../composables/useI18n'
+  import { useFilters } from '../composables/useFilters'
+  import { useI18n } from '../composables/useI18n'
 
-export default {
-  name: 'FilterBar',
-  setup() {
-    const {
-      selectedPeriod,
-      selectedLocation,
-      selectedCategory,
-      selectedStatus,
-      hasActiveFilters,
-      resetFilters
-    } = useFilters()
+  export default {
+    name: 'FilterBar',
+    setup() {
+      const {
+        selectedPeriod,
+        selectedLocation,
+        selectedCategory,
+        selectedStatus,
+        hasActiveFilters,
+        resetFilters,
+      } = useFilters()
 
-    const { t } = useI18n()
+      const { t } = useI18n()
 
-    return {
-      t,
-      selectedPeriod,
-      selectedLocation,
-      selectedCategory,
-      selectedStatus,
-      hasActiveFilters,
-      resetFilters
-    }
+      return {
+        t,
+        selectedPeriod,
+        selectedLocation,
+        selectedCategory,
+        selectedStatus,
+        hasActiveFilters,
+        resetFilters,
+      }
+    },
   }
-}
 </script>
 
 <style scoped>
-.filters-bar {
-  background: var(--surface-card);
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 0.75rem 0;
-  position: sticky;
-  top: 52px;
-  z-index: 80;
-  flex-shrink: 0;
-}
+  .filters-bar {
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0.75rem 0;
+    position: sticky;
+    top: 52px;
+    z-index: 80;
+    flex-shrink: 0;
+  }
 
-.filters-container {
-  padding: 0 var(--space-6);
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+  .filters-container {
+    padding: 0 var(--space-6);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
 
-.filters-grid {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex: 1;
-}
+  .filters-grid {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+  }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
-.filter-group label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
-  white-space: nowrap;
-}
+  .filter-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+  }
 
-.filter-select {
-  padding: 0.4rem 0.75rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.813rem;
-  color: #0f172a;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-weight: 500;
-  min-width: 140px;
-}
+  .filter-select {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.813rem;
+    color: #0f172a;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+    min-width: 140px;
+  }
 
-.filter-select:hover {
-  border-color: #94a3b8;
-}
+  .filter-select:hover {
+    border-color: #94a3b8;
+  }
 
-.filter-select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
+  .filter-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
 
-.reset-filters-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
+  .reset-filters-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.4rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
 
-.reset-filters-btn:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #0f172a;
-}
+  .reset-filters-btn:hover:not(:disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+  }
 
-.reset-filters-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
+  .reset-filters-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
 
-.reset-filters-btn svg {
-  width: 18px;
-  height: 18px;
-}
+  .reset-filters-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 </style>
